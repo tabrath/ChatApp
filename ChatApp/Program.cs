@@ -21,21 +21,41 @@ namespace ChatApp
         public void LogError(string message) => Console.WriteLine($"[Error] {message}");
     }
 
+    public class Prompt
+    {
+        public string Ask(string prefix, Func<string, bool> check) => Ask(prefix, s => s, check);
+
+        public T Ask<T>(string prefix, Func<string, T> convert, Func<T, bool> check)
+        {
+            var result = default(T);
+            while (!check(result))
+            {
+                Console.Write($"{prefix}: ");
+                result = convert(Console.ReadLine()?.TrimEnd() ?? string.Empty);
+            }
+            return result;
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
             var logger = new Logger();
             var options = new Options();
+            var prompt = new Prompt();
 
-            Console.WriteLine(string.Join(", ", args));
-            Console.Write("Nickname: ");
-            options.Nickname = Console.ReadLine()?.Trim();
-            if (string.IsNullOrEmpty(options.Nickname))
+            options.Nickname = prompt.Ask("Enter a nickname", nick =>
             {
-                logger.LogError("You must provide a nickname");
-                return;
-            }
+                if (string.IsNullOrEmpty(nick))
+                {
+                    logger.LogError("You must provide a nickname");
+                    return false;
+                }
+                return true;
+            });
+
+            // @Todo prompt for listen port, if no change, use default or argument
             if (args.Length >= 1)
             {
                 var listenPort = options.ListenPort;
@@ -62,8 +82,7 @@ namespace ChatApp
 
                 Listen(logger, options.Nickname, listener, (c, n) =>
                 {
-                    Console.Write($"Connection request from {n} ({c.RemoteEndPoint}), accept? [Yn] ");
-                    if (Console.ReadKey().Key == ConsoleKey.N)
+                    if (prompt.Ask($"Connection request from {n} ({c.RemoteEndPoint}), accept? [Yn]", answer => true) == "n")
                         return false;
 
                     client = c;
@@ -79,8 +98,7 @@ namespace ChatApp
 
                 while (!quit)
                 {
-                    Console.Write($"{options.Nickname}$ ");
-                    var inputargs = Console.ReadLine()?.Trim().Split(' ');
+                    var inputargs = prompt.Ask($"{options.Nickname}$", s => !string.IsNullOrWhiteSpace(s)).Split(' ');
                     if (inputargs == null || inputargs.Length == 0)
                         continue;
 
@@ -276,7 +294,7 @@ namespace ChatApp
 
                     if (!accept(client, clientNickname))
                     {
-                        Console.WriteLine($"{ep}: Rejected connection");
+                        logger.LogError($"{ep}: Rejected connection");
                         client.Dispose();
                         Listen(logger, nickname, listener, accept, disconnected);
                         return;
