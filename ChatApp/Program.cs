@@ -14,10 +14,18 @@ namespace ChatApp
         public int ListenPort { get; set; } = 1337;
     }
 
+    public class Logger
+    {
+        public void LogInfo(string message) => Console.WriteLine($"[Info] {message}");
+        public void LogWarning(string message) => Console.WriteLine($"[Warning] {message}");
+        public void LogError(string message) => Console.WriteLine($"[Error] {message}");
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
+            var logger = new Logger();
             var options = new Options();
 
             Console.WriteLine(string.Join(", ", args));
@@ -25,7 +33,7 @@ namespace ChatApp
             options.Nickname = Console.ReadLine()?.Trim();
             if (string.IsNullOrEmpty(options.Nickname))
             {
-                Console.WriteLine("You must provide a nickname");
+                logger.LogError("You must provide a nickname");
                 return;
             }
             if (args.Length >= 1)
@@ -33,7 +41,7 @@ namespace ChatApp
                 var listenPort = options.ListenPort;
                 if (!int.TryParse(args[0], out listenPort))
                 {
-                    Console.WriteLine("Could not parse port argument");
+                    logger.LogError("Could not parse port argument");
                     return;
                 }
                 options.ListenPort = listenPort;
@@ -50,9 +58,9 @@ namespace ChatApp
                 var listenEndPoint = new IPEndPoint(IPAddress.Any, options.ListenPort);
                 listener.Bind(listenEndPoint);
                 listener.Listen(1);
-                Console.WriteLine($"Listening on {listenEndPoint}");
+                logger.LogInfo($"Listening on {listenEndPoint}");
 
-                Listen(options.Nickname, listener, (c, n) =>
+                Listen(logger, options.Nickname, listener, (c, n) =>
                 {
                     Console.Write($"Connection request from {n} ({c.RemoteEndPoint}), accept? [Yn] ");
                     if (Console.ReadKey().Key == ConsoleKey.N)
@@ -79,13 +87,13 @@ namespace ChatApp
                     switch (inputargs[0])
                     {
                         case "status":
-                            Console.WriteLine($"Connected: {client != null}");
+                            logger.LogInfo($"Connected: {client != null}");
                             break;
 
                         case "connect":
                             if (client != null)
                             {
-                                Console.WriteLine("Error: you're already connected");
+                                logger.LogError("You're already connected");
                                 break;
                             }
 
@@ -97,17 +105,17 @@ namespace ChatApp
                                     IPAddress ip;
                                     if (!IPAddress.TryParse(addr[0], out ip))
                                     {
-                                        Console.WriteLine("Error: could not parse ip address");
+                                        logger.LogError("Could not parse ip address");
                                         break;
                                     }
                                     int port;
                                     if (!int.TryParse(addr[1], out port))
                                     {
-                                        Console.WriteLine("Error: could not parse port");
+                                        logger.LogError("Could not parse port");
                                         break;
                                     }
 
-                                    Console.Write("Connecting.. ");
+                                    logger.LogInfo("Connecting.. ");
                                     try
                                     {
                                         client = new Socket(AddressFamily.InterNetwork, SocketType.Stream,
@@ -133,7 +141,7 @@ namespace ChatApp
 
                                         clientNickname = Encoding.UTF8.GetString(nicknameBuffer);
 
-                                        Console.WriteLine("done");
+                                        logger.LogInfo("connected");
 
                                         var receiveBuffer = new byte[4096];
                                         client.BeginReceive(receiveBuffer, 0, receiveBuffer.Length, SocketFlags.None,
@@ -145,30 +153,30 @@ namespace ChatApp
                                                     if (received <= 0)
                                                         throw new Exception("No data");
 
-                                                    Console.WriteLine(
+                                                    logger.LogInfo(
                                                         $"{clientNickname} ({clientEndPoint}): {Encoding.UTF8.GetString(receiveBuffer, 0, received)}");
                                                 }
                                                 catch (Exception e)
                                                 {
-                                                    Console.WriteLine($"Disconnected: {e.Message}");
+                                                    logger.LogError($"Disconnected: {e.Message}");
                                                     client = null;
                                                 }
                                             }, null);
                                     }
                                     catch (Exception e)
                                     {
-                                        Console.WriteLine($"failed: {e.Message}");
+                                        logger.LogError(e.Message);
                                         client = null;
                                     }
                                 }
                                 else
                                 {
-                                    Console.WriteLine("Error: expected address with port");
+                                    logger.LogError("Expected address with port");
                                 }
                             }
                             else
                             {
-                                Console.WriteLine("Error: expected argument of address:port");
+                                logger.LogError("Expected argument of address:port");
                             }
 
                             break;
@@ -176,7 +184,7 @@ namespace ChatApp
                         case "disconnect":
                             if (client == null)
                             {
-                                Console.WriteLine("Error: you're not connected");
+                                logger.LogError("You're not connected");
                                 break;
                             }
 
@@ -187,13 +195,13 @@ namespace ChatApp
                         case "send":
                             if (client == null)
                             {
-                                Console.WriteLine("Error: you're not connected");
+                                logger.LogError("You're not connected");
                                 break;
                             }
 
                             if (inputargs.Length == 1)
                             {
-                                Console.WriteLine("Error: no message to send");
+                                logger.LogError("No message to send");
                                 break;
                             }
 
@@ -207,13 +215,14 @@ namespace ChatApp
                             }
 
                             if (error != SocketError.Success)
-                                Console.WriteLine($"Error: could not send message ({error})");
+                                logger.LogError($"Could not send message ({error})");
                             else
-                                Console.WriteLine($"me: {message}");
+                                logger.LogInfo($"me: {message}");
 
                             break;
 
                         case "help":
+                            // @Todo relates to issue #3
                             Console.WriteLine("connect [address:port]");
                             Console.WriteLine("disconnect");
                             Console.WriteLine("send [message]");
@@ -230,7 +239,7 @@ namespace ChatApp
             }
             catch (Exception e)
             {
-                Console.WriteLine($"Exception: {e.Message}");
+                logger.LogError(e.Message);
             }
             finally
             {
@@ -239,7 +248,7 @@ namespace ChatApp
             }
         }
 
-        private static void Listen(string nickname, Socket listener, Func<Socket, string, bool> accept, Action disconnected)
+        private static void Listen(Logger logger, string nickname, Socket listener, Func<Socket, string, bool> accept, Action disconnected)
         {
             listener.BeginAccept(ar =>
             {
@@ -248,7 +257,7 @@ namespace ChatApp
                     var client = listener.EndAccept(ar);
                     var ep = client.RemoteEndPoint;
 
-                    Console.WriteLine($"{ep}: Connected");
+                    logger.LogInfo($"{ep}: Connected");
 
                     var nicknameBuffer = new byte[1];
                     if (client.Receive(nicknameBuffer, 0, 1, SocketFlags.None) != 1)
@@ -269,7 +278,7 @@ namespace ChatApp
                     {
                         Console.WriteLine($"{ep}: Rejected connection");
                         client.Dispose();
-                        Listen(nickname, listener, accept, disconnected);
+                        Listen(logger, nickname, listener, accept, disconnected);
                         return;
                     }
 
@@ -281,7 +290,7 @@ namespace ChatApp
                         while ((received = client.Receive(buffer, 0, buffer.Length, SocketFlags.None, out error)) > 0 &&
                                error == SocketError.Success)
                         {
-                            Console.WriteLine($"{clientNickname} ({ep}): {Encoding.UTF8.GetString(buffer, 0, received)}");
+                            logger.LogInfo($"{clientNickname} ({ep}): {Encoding.UTF8.GetString(buffer, 0, received)}");
                         }
 
                         if (error != SocketError.Success)
@@ -289,7 +298,7 @@ namespace ChatApp
                     }
                     catch (Exception e)
                     {
-                        Console.WriteLine($"{ep}: Disconnected ({e.Message})");
+                        logger.LogError($"{ep}: Disconnected ({e.Message})");
                     }
                 }
                 catch (ObjectDisposedException)
@@ -298,7 +307,7 @@ namespace ChatApp
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine($"Error: {e.Message}");
+                    logger.LogError(e.Message);
                 }
 
                 disconnected();
