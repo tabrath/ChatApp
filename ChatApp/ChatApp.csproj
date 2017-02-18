@@ -43,7 +43,16 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ChatContext.cs" />
+    <Compile Include="ConnectionRequestEventArgs.cs" />
+    <Compile Include="ContextStatus.cs" />
+    <Compile Include="Logger.cs" />
+    <Compile Include="MessageEventArgs.cs" />
+    <Compile Include="MessageReceivedEventArgs.cs" />
+    <Compile Include="MessageSentEventArgs.cs" />
+    <Compile Include="Options.cs" />
     <Compile Include="Program.cs" />
+    <Compile Include="Prompt.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
