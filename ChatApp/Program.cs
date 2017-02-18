@@ -8,26 +8,35 @@ using System.Threading.Tasks;
 
 namespace ChatApp
 {
+    public class Options
+    {
+        public string Nickname { get; set; } = "";
+        public int ListenPort { get; set; } = 1337;
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
+            var options = new Options();
+
             Console.WriteLine(string.Join(", ", args));
             Console.Write("Nickname: ");
-            var nickname = Console.ReadLine()?.Trim();
-            if (string.IsNullOrEmpty(nickname))
+            options.Nickname = Console.ReadLine()?.Trim();
+            if (string.IsNullOrEmpty(options.Nickname))
             {
                 Console.WriteLine("You must provide a nickname");
                 return;
             }
-            var listenPort = 1337;
             if (args.Length >= 1)
             {
+                var listenPort = options.ListenPort;
                 if (!int.TryParse(args[0], out listenPort))
                 {
                     Console.WriteLine("Could not parse port argument");
                     return;
                 }
+                options.ListenPort = listenPort;
             }
 
             Socket client = null;
@@ -38,12 +47,12 @@ namespace ChatApp
                 string clientNickname = null;
                 EndPoint clientEndPoint = null;
                 listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-                var listenEndPoint = new IPEndPoint(IPAddress.Any, listenPort);
+                var listenEndPoint = new IPEndPoint(IPAddress.Any, options.ListenPort);
                 listener.Bind(listenEndPoint);
                 listener.Listen(1);
                 Console.WriteLine($"Listening on {listenEndPoint}");
 
-                Listen(nickname, listener, (c, n) =>
+                Listen(options.Nickname, listener, (c, n) =>
                 {
                     Console.Write($"Connection request from {n} ({c.RemoteEndPoint}), accept? [Yn] ");
                     if (Console.ReadKey().Key == ConsoleKey.N)
@@ -62,7 +71,7 @@ namespace ChatApp
 
                 while (!quit)
                 {
-                    Console.Write($"{nickname}$ ");
+                    Console.Write($"{options.Nickname}$ ");
                     var inputargs = Console.ReadLine()?.Trim().Split(' ');
                     if (inputargs == null || inputargs.Length == 0)
                         continue;
@@ -105,7 +114,7 @@ namespace ChatApp
                                             ProtocolType.Tcp);
                                         client.Connect(ip, port);
 
-                                        var nicknameBuffer = Encoding.UTF8.GetBytes(nickname);
+                                        var nicknameBuffer = Encoding.UTF8.GetBytes(options.Nickname);
                                         nicknameBuffer =
                                             new[] {(byte) nicknameBuffer.Length}.Concat(nicknameBuffer).ToArray();
                                         if (client.Send(nicknameBuffer, 0, nicknameBuffer.Length, SocketFlags.None) !=
